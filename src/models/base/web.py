@@ -44,6 +44,16 @@ def _allowed_gai_family():
     return family
 
 
+def _has_explicit_cookie(headers):
+    """判断请求头中是否显式携带 Cookie（大小写不敏感）。"""
+    if not headers:
+        return False
+    for key in headers:
+        if key.lower() == "cookie":
+            return True
+    return False
+
+
 try:
     if config.ipv4_only:
         urllib3_cn.allowed_gai_family = _allowed_gai_family
@@ -232,7 +242,7 @@ class WebRequests:
         return False, f"请求失败! {url}"
 
     def _post_text(self, url, data, json_data, headers, cookies, proxies, timeout, keep):
-        """发送POST请求并获取文本响应"""
+        """发送POST文本响应"""
         session = self.session_g if keep else requests
         for i in range(config.retry):
             try:
@@ -412,29 +422,43 @@ class WebRequests:
                 "https": None,
             }
 
+        # 显式 Cookie 头必须作为该请求唯一且权威的 Cookie。使用独立 session（空 cookie jar），
+        # 避免共享单例 cookie jar 中已累积的同域访客 cookie 被额外注入，形成第二个 Cookie 头，
+        # 否则服务器会优先采用访客会话而忽略显式 Cookie（表现为任何 Cookie 都校验失败）。
+        if _has_explicit_cookie(headers):
+            session = curl_cffi.requests.Session(max_redirects=10)
+            isolated = True
+        else:
+            session = self.curl_session
+            isolated = False
+
         signal.add_log(f"🔎 请求 {url}")
-        for i in range(int(retry_times)):
-            try:
-                response = self.curl_session.get(
-                    url_encode(url), headers=headers, cookies=cookies, proxies=proxies, impersonate="chrome120"
-                )
-                if "amazon" in url:
-                    response.encoding = "Shift_JIS"
-                else:
-                    response.encoding = "UTF-8"
-                if response.status_code == 200:
-                    signal.add_log(f"✅ 成功 {url}")
-                    return response.headers, response.text
-                else:
-                    error_info = f"{response.status_code} {url}"
-                    signal.add_log(f"🔴 重试 [{i + 1}/{retry_times}] {error_info}")
+        try:
+            for i in range(int(retry_times)):
+                try:
+                    response = session.get(
+                        url_encode(url), headers=headers, cookies=cookies, proxies=proxies, impersonate="chrome120"
+                    )
+                    if "amazon" in url:
+                        response.encoding = "Shift_JIS"
+                    else:
+                        response.encoding = "UTF-8"
+                    if response.status_code == 200:
+                        signal.add_log(f"✅ 成功 {url}")
+                        return response.headers, response.text
+                    else:
+                        error_info = f"{response.status_code} {url}"
+                        signal.add_log(f"🔴 重试 [{i + 1}/{retry_times}] {error_info}")
+                        continue
+                except Exception as e:
+                    error_info = f"{url}\nError: {e}"
+                    signal.add_log(f"[{i + 1}/{retry_times}] {error_info}")
                     continue
-            except Exception as e:
-                error_info = f"{url}\nError: {e}"
-                signal.add_log(f"[{i + 1}/{retry_times}] {error_info}")
-                continue
-        signal.add_log(f"🔴 请求失败！{error_info}")
-        return False, error_info
+            signal.add_log(f"🔴 请求失败！{error_info}")
+            return False, error_info
+        finally:
+            if isolated:
+                session.close()
 
 
 web = WebRequests()
@@ -473,7 +497,7 @@ def check_url(url, length=False, real_url=False):
             "Referer": "http://www.getchu.com/top.html",
         }
         headers.update(headers_o)
-    # javbus封面图需携带refer，refer似乎没有做强校验，但须符合格式要求，否则403
+    # javbus封面图需携带refer，refer似乎没有做强校验，但需符合格式要求，否则403
     elif "javbus" in url:
         headers_o = {
             "Referer": "https://www.javbus.com/",
@@ -487,7 +511,7 @@ def check_url(url, length=False, real_url=False):
             )
 
             # 不输出获取 dmm预览视频(trailer) 最高分辨率的测试结果到日志中
-            # get_dmm_trailer() 函数在多条错误的链接中找最高分辨率的链接，错误没有必要输出，避免误解为网络或软件问题
+            # get_dmm_trailer() 函数在多条错误的链接中找最高分辨率的链接，错误没有必要输出，避免误解为软件问题
             if r.status_code == 404 and "_w.mp4" in url:
                 if j + 1 < retry_times:
                     continue
@@ -505,7 +529,7 @@ def check_url(url, length=False, real_url=False):
             if real_url:
                 return true_url
 
-            # 检查是否需要登录 https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=637921621668064
+            # 检查是否需要登录 https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=6370921621668064
             if "login" in true_url:
                 signal.add_log(f"🔴 检测未通过！需要登录查看 {true_url}")
                 return 0
@@ -646,7 +670,7 @@ if "__main__" == __name__:
         "https://cc3001.dmm.co.jp/litevideo/freepv/1/118/118abw00018/118abw00018_mhb_w.mp4",
         "https://cc3001.dmm.co.jp/litevideo/freepv/1/118/118abw00019/118abw00019_mhb_w.mp4",
         "https://www.prestige-av.com/images/corner/goods/prestige/tktabw/018/pb_tktabw-018.jpg",
-        "https://iqq1.one/preview/80/b/3SBqI8OjheI-800.jpg?v=1636404497",
+        "https://iqq1.one/preview/80/b/3SBqI8OjheI-800.jpg?v=163640497",
     ]
     for each in list1:
         url = each
@@ -654,7 +678,7 @@ if "__main__" == __name__:
         t = threading.Thread(target=multi_download, args=(url, file_path))
         t.start()
 
-    # 死循环，避免程序程序完后，pool自动关闭
+    # 死循环，避免程序结束后，pool自动关闭
     while True:
         pass
 
@@ -688,16 +712,15 @@ def get_dmm_trailer(trailer_url):  # 如果预览片地址为 dmm ，尝试获�
     if ".dmm.co" not in trailer_url:
         return trailer_url
     if trailer_url.startswith("//"):
-        trailer_url = "https:" + trailer_url
+        trailer_url = "https:"
     """
     '_sm_w.mp4': 320*180, 3.8MB     # 最低分辨率
     '_dm_w.mp4': 560*316, 10.1MB    # 中等分辨率
     '_dmb_w.mp4': 720*404, 14.6MB   # 次高分辨率
     '_mhb_w.mp4': 720*404, 27.9MB   # 最高分辨率
     https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_sm_w.mp4
-    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_dm_w.mp4
-    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_dmb_w.mp4
-    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_mhb_w.mp4
+    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090_dm_w.mp4
+    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090_dmb_w.mp4
     """
 
     # keylist = ['_sm_w.mp4', '_dm_w.mp4', '_dmb_w.mp4', '_mhb_w.mp4']
@@ -738,7 +761,7 @@ def ping_host(host_address):
     result_list = [None] * count
     thread_list = [0] * count
     for i in range(count):
-        thread_list[i] = threading.Thread(target=_ping_host_thread, args=(host_address, result_list, i))
+        thread_list[i] = threading.Thread(target=_ping_host_thread, args=(host_address, result_list))
         thread_list[i].start()
     for i in range(count):
         thread_list[i].join()
@@ -804,11 +827,11 @@ def _get_pic_by_google(pic_url):
     result, response = get_html(req_url, keep=False)
     big_pic = True
     if result:
-        url_list = re.findall(r'a href="([^"]+isz:l[^"]+)">', response)
-        url_list_middle = re.findall(r'a href="([^"]+isz:m[^"]+)">', response)
+        url_list = re.findall(r'a href="([^"]+is z:l[^"]+)", response)
+        url_list_middle = re.findall(r'a href="([^"]+is z:m[^"]+)", response)
         if not url_list and url_list_middle:
             url_list = url_list_middle
-            big_pic = False
+            webp = True
         if url_list:
             req_url = "https://www.google.com" + url_list[0].replace("amp;", "")
             result, response = get_html(req_url, keep=False)
