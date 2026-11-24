@@ -242,7 +242,7 @@ class WebRequests:
         return False, f"请求失败! {url}"
 
     def _post_text(self, url, data, json_data, headers, cookies, proxies, timeout, keep):
-        """发送POST文本响应"""
+        """发送POST请求并获取文本响应"""
         session = self.session_g if keep else requests
         for i in range(config.retry):
             try:
@@ -497,7 +497,7 @@ def check_url(url, length=False, real_url=False):
             "Referer": "http://www.getchu.com/top.html",
         }
         headers.update(headers_o)
-    # javbus封面图需携带refer，refer似乎没有做强校验，但需符合格式要求，否则403
+    # javbus封面图需携带refer，refer似乎没有做强校验，但须符合格式要求，否则403
     elif "javbus" in url:
         headers_o = {
             "Referer": "https://www.javbus.com/",
@@ -529,7 +529,7 @@ def check_url(url, length=False, real_url=False):
             if real_url:
                 return true_url
 
-            # 检查是否需要登录 https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=6370921621668064
+            # 检查是否需要登录 https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=637921621668064
             if "login" in true_url:
                 signal.add_log(f"🔴 检测未通过！需要登录查看 {true_url}")
                 return 0
@@ -670,7 +670,7 @@ if "__main__" == __name__:
         "https://cc3001.dmm.co.jp/litevideo/freepv/1/118/118abw00018/118abw00018_mhb_w.mp4",
         "https://cc3001.dmm.co.jp/litevideo/freepv/1/118/118abw00019/118abw00019_mhb_w.mp4",
         "https://www.prestige-av.com/images/corner/goods/prestige/tktabw/018/pb_tktabw-018.jpg",
-        "https://iqq1.one/preview/80/b/3SBqI8OjheI-800.jpg?v=163640497",
+        "https://iqq1.one/preview/80/b/3SBqI8OjheI-800.jpg?v=1636404497",
     ]
     for each in list1:
         url = each
@@ -678,7 +678,7 @@ if "__main__" == __name__:
         t = threading.Thread(target=multi_download, args=(url, file_path))
         t.start()
 
-    # 死循环，避免程序结束后，pool自动关闭
+    # 死循环，避免程序程序完后，pool自动关闭
     while True:
         pass
 
@@ -712,7 +712,7 @@ def get_dmm_trailer(trailer_url):  # 如果预览片地址为 dmm ，尝试获�
     if ".dmm.co" not in trailer_url:
         return trailer_url
     if trailer_url.startswith("//"):
-        trailer_url = "https:"
+        trailer_url = "https:" + trailer_url
     """
     '_sm_w.mp4': 320*180, 3.8MB     # 最低分辨率
     '_dm_w.mp4': 560*316, 10.1MB    # 中等分辨率
@@ -721,6 +721,7 @@ def get_dmm_trailer(trailer_url):  # 如果预览片地址为 dmm ，尝试获�
     https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_sm_w.mp4
     https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090_dm_w.mp4
     https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090_dmb_w.mp4
+    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_mhb_w.mp4
     """
 
     # keylist = ['_sm_w.mp4', '_dm_w.mp4', '_dmb_w.mp4', '_mhb_w.mp4']
@@ -827,11 +828,11 @@ def _get_pic_by_google(pic_url):
     result, response = get_html(req_url, keep=False)
     big_pic = True
     if result:
-        url_list = re.findall(r'a href="([^"]+is z:l[^"]+)", response)
-        url_list_middle = re.findall(r'a href="([^"]+is z:m[^"]+)", response)
+        url_list = re.findall(r'a href="([^"]+isz:l[^"]+)">', response)
+        url_list_middle = re.findall(r'a href="([^"]+isz:m[^"]+)">', response)
         if not url_list and url_list_middle:
             url_list = url_list_middle
-            webp = True
+            big_pic = False
         if url_list:
             req_url = "https://www.google.com" + url_list[0].replace("amp;", "")
             result, response = get_html(req_url, keep=False)
