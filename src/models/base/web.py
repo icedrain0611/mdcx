@@ -511,7 +511,7 @@ def check_url(url, length=False, real_url=False):
             )
 
             # 不输出获取 dmm预览视频(trailer) 最高分辨率的测试结果到日志中
-            # get_dmm_trailer() 函数在多条错误的链接中找最高分辨率的链接，错误没有必要输出，避免误解为软件问题
+            # get_dmm_trailer() 函数在多条错误的链接中找最高分辨率的链接，错误没有必要输出，避免误解为网络或软件问题
             if r.status_code == 404 and "_w.mp4" in url:
                 if j + 1 < retry_times:
                     continue
@@ -719,8 +719,8 @@ def get_dmm_trailer(trailer_url):  # 如果预览片地址为 dmm ，尝试获�
     '_dmb_w.mp4': 720*404, 14.6MB   # 次高分辨率
     '_mhb_w.mp4': 720*404, 27.9MB   # 最高分辨率
     https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_sm_w.mp4
-    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090_dm_w.mp4
-    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090_dmb_w.mp4
+    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_dm_w.mp4
+    https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_dmb_w.mp4
     https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00090/ssis00090_mhb_w.mp4
     """
 
@@ -762,7 +762,7 @@ def ping_host(host_address):
     result_list = [None] * count
     thread_list = [0] * count
     for i in range(count):
-        thread_list[i] = threading.Thread(target=_ping_host_thread, args=(host_address, result_list))
+        thread_list[i] = threading.Thread(target=_ping_host_thread, args=(host_address, result_list, i))
         thread_list[i].start()
     for i in range(count):
         thread_list[i].join()
