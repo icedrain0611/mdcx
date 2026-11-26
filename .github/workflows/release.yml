@@ -63,7 +63,9 @@ jobs:
       - name: "Set up Python"
         uses: actions/setup-python@v5
         with:
-          python-version-file: "pyproject.toml"
+          # 固定 3.13：pywin32/av 等依赖尚无 cp315 wheel，
+          # 不能用 python-version-file 让其解析到最新的 3.15
+          python-version: "3.13"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
