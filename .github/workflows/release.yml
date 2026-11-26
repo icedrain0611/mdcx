@@ -12,6 +12,11 @@ on:
         description: "Tag"
         required: true
 
+# 上传/覆盖 Release 资产需要 contents 写权限，
+# 否则 svenstaro/upload-release-action 会报 Resource not accessible by integration
+permissions:
+  contents: write
+
 jobs:
   init-matrix:
     runs-on: ubuntu-latest

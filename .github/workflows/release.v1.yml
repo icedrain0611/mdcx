@@ -10,6 +10,12 @@ on:
                 description: "Release body"
                 required: false
                 default: ""
+
+# 上传/覆盖 Release 资产需要 contents 写权限，
+# 否则 svenstaro/upload-release-action 会报 Resource not accessible by integration
+permissions:
+    contents: write
+
 env:
     PYTHON_VERSION: "3.9"
     IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
